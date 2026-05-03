@@ -251,25 +251,60 @@ def available_slots(date_text: str, limit: int = 12) -> List[str]:
     return candidates
 
 
-def _send_email(subject: str, body: str, to_email: str) -> bool:
+def _smtp_ports() -> List[int]:
+    configured_port = int(_env_value("SMTP_PORT") or "587")
+    ports = [configured_port]
+    if configured_port == 587:
+        ports.append(465)
+    elif configured_port == 465:
+        ports.append(587)
+    return ports
+
+
+def _send_email_once(subject: str, body: str, to_email: str, port: int) -> bool:
     host = _env_value("SMTP_HOST")
     user = _env_value("SMTP_USER")
     password = _env_value("SMTP_PASSWORD").replace(" ", "")
     if not host or not user or not password:
         return False
 
-    port = int(_env_value("SMTP_PORT") or "587")
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = user
     message["To"] = to_email
     message.set_content(body)
 
-    with smtplib.SMTP(host, port, timeout=25) as server:
-        server.starttls()
+    if port == 465:
+        server_context = smtplib.SMTP_SSL(host, port, timeout=25)
+    else:
+        server_context = smtplib.SMTP(host, port, timeout=25)
+
+    with server_context as server:
+        if port != 465:
+            server.starttls()
         server.login(user, password)
         server.send_message(message)
     return True
+
+
+def _send_email(subject: str, body: str, to_email: str) -> bool:
+    errors = []
+    for port in _smtp_ports():
+        try:
+            return _send_email_once(subject, body, to_email, port)
+        except Exception as exc:
+            errors.append(f"port {port}: {type(exc).__name__}: {exc}")
+    raise RuntimeError("; ".join(errors))
+
+
+def _friendly_notification_error(errors: List[str]) -> str:
+    joined = " ".join(errors).lower()
+    if "network is unreachable" in joined:
+        return (
+            "Email could not be sent from the hosted Space because outbound SMTP networking "
+            "is blocked or unreachable there. The booking is saved in the admin portal."
+        )
+    return "Email could not be sent from the hosted runtime. The booking is saved in the admin portal."
 
 
 def notify_booking(booking: Dict) -> Dict:
@@ -322,6 +357,9 @@ def notify_booking(booking: Dict) -> Dict:
         "owner_email_sent": owner_sent,
         "visitor_email_sent": visitor_sent,
         "errors": notification_errors,
+        "friendly_error": _friendly_notification_error(notification_errors)
+        if notification_errors
+        else "",
     }
 
 

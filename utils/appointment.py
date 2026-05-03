@@ -286,7 +286,8 @@ def update_booking_state(message: str, state: Dict | None) -> Tuple[str, Dict]:
         notification_note = "Abhishek has been notified by email. Visitor confirmation email could not be sent."
     elif notifications.get("smtp_configured"):
         notification_note = (
-            "Booking saved, but the email notification failed. Admin alert was saved locally for review."
+            notifications.get("friendly_error")
+            or "Booking saved, but the email notification failed. Admin alert was saved locally for review."
         )
     else:
         notification_note = (
