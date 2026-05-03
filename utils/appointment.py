@@ -41,7 +41,7 @@ def extract_booking_details(message: str) -> dict:
     message = message or ""
     email_match = re.search(r"[\w.\-+]+@[\w.\-]+\.\w+", message)
     date_match = re.search(
-        r"\b(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+        r"\b(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}(?:\s+\d{4})?|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
         message,
         re.I,
     )
@@ -131,6 +131,38 @@ def _apply_slot_label(details: Dict, slot_label: str) -> None:
         details["time"] = match.group(2)
 
 
+def _apply_extracted_details(details: Dict, extracted: Dict, fields: tuple[str, ...]) -> None:
+    for field in fields:
+        if extracted.get(field):
+            details[field] = extracted[field]
+
+
+def _reset_invalid_slot_details(state: Dict, message: str) -> None:
+    details = state.setdefault("details", {})
+    lowered = message.lower()
+    if "date/time" in lowered or "date" in lowered:
+        details.pop("date", None)
+        details.pop("time", None)
+        state["step"] = "date"
+    elif "time" in lowered or "past" in lowered:
+        details.pop("time", None)
+        state["step"] = "time"
+    else:
+        details.pop("date", None)
+        details.pop("time", None)
+        state["step"] = "date"
+
+
+def _remaining_booking_text(message: str, extracted: Dict) -> str:
+    remaining = message or ""
+    for value in extracted.values():
+        if value:
+            remaining = re.sub(re.escape(value), " ", remaining, flags=re.I)
+    remaining = re.sub(r"\b(ist|india|on|at|for|call|meeting|appointment)\b", " ", remaining, flags=re.I)
+    remaining = re.sub(r"\s+", " ", remaining).strip(" .,-:")
+    return remaining
+
+
 def update_booking_state(message: str, state: Dict | None) -> Tuple[str, Dict]:
     """Collect booking details across turns without external calendar writes."""
     state = state or start_booking_state()
@@ -156,17 +188,13 @@ def update_booking_state(message: str, state: Dict | None) -> Tuple[str, Dict]:
     if used_pending_slot:
         current_field = _next_missing_field(details)
     if current_field == "name":
-        for key in ("email", "date", "time"):
-            if extracted.get(key):
-                details[key] = extracted[key]
+        _apply_extracted_details(details, extracted, ("email", "date", "time"))
         if _looks_like_name(message):
             details["name"] = message
         else:
             return "Please share your name so I can continue the booking request.", state
     elif current_field == "email":
-        for key in ("date", "time"):
-            if extracted.get(key):
-                details[key] = extracted[key]
+        _apply_extracted_details(details, extracted, ("date", "time"))
         if extracted.get("email"):
             details["email"] = extracted["email"]
         else:
@@ -177,6 +205,9 @@ def update_booking_state(message: str, state: Dict | None) -> Tuple[str, Dict]:
             if extracted.get("time"):
                 details["time"] = extracted["time"]
                 state.pop("pending_slots", None)
+                remaining = _remaining_booking_text(message, extracted)
+                if remaining and not details.get("purpose") and len(remaining) >= 4:
+                    details["purpose"] = remaining
         else:
             details["date"] = message
     elif current_field == "time":
@@ -185,6 +216,9 @@ def update_booking_state(message: str, state: Dict | None) -> Tuple[str, Dict]:
         if extracted.get("time"):
             details["time"] = extracted["time"]
             state.pop("pending_slots", None)
+            remaining = _remaining_booking_text(message, extracted)
+            if remaining and not details.get("purpose") and len(remaining) >= 4:
+                details["purpose"] = remaining
         else:
             return "Please share your preferred time and timezone, for example: 4 PM IST.", state
     elif current_field == "purpose":
@@ -216,9 +250,9 @@ def update_booking_state(message: str, state: Dict | None) -> Tuple[str, Dict]:
     if not booking.get("created"):
         if booking.get("reason") == "parse_error":
             state["active"] = True
-            state["step"] = "time"
+            _reset_invalid_slot_details(state, booking.get("message", ""))
             return (
-                "I could not understand that date/time clearly. Please share it like: today 7 PM IST or 15/05/2026 4 PM IST.",
+                "I could not understand that date/time clearly. Please share it like: today 7 PM IST, 7 May 8 PM IST, or 15/05/2026 4 PM IST.",
                 state,
             )
         state["active"] = True

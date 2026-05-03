@@ -12,7 +12,7 @@ import os
 import re
 import smtplib
 import uuid
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Dict, List
@@ -57,8 +57,9 @@ def list_bookings(limit: int = 50) -> List[Dict]:
     return bookings[:limit]
 
 
-def _parse_date(date_text: str) -> datetime.date:
+def _parse_date(date_text: str) -> date:
     text = (date_text or "").strip().lower()
+    text = re.sub(r"\b(\d{1,2})(st|nd|rd|th)\b", r"\1", text)
     today = datetime.now(TIMEZONE).date()
     if text == "today":
         return today
@@ -94,6 +95,17 @@ def _parse_date(date_text: str) -> datetime.date:
         except ValueError:
             pass
 
+    for fmt in ("%d %b", "%d %B"):
+        try:
+            parsed = datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+
+        candidate = date(today.year, parsed.month, parsed.day)
+        if candidate < today:
+            candidate = date(today.year + 1, parsed.month, parsed.day)
+        return candidate
+
     raise ValueError("Could not understand the date.")
 
 
@@ -121,7 +133,10 @@ def _parse_time(time_text: str) -> time:
 def parse_slot(date_text: str, time_text: str) -> datetime:
     slot_date = _parse_date(date_text)
     slot_time = _parse_time(time_text)
-    return datetime.combine(slot_date, slot_time, tzinfo=TIMEZONE)
+    slot_start = datetime.combine(slot_date, slot_time, tzinfo=TIMEZONE)
+    if slot_start <= datetime.now(TIMEZONE):
+        raise ValueError("That date/time is already in the past.")
+    return slot_start
 
 
 def _slot_key(slot_start: datetime) -> str:
