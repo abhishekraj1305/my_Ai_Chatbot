@@ -1,0 +1,13 @@
+gradio
+chromadb
+langchain
+langchain-text-splitters
+sentence-transformers
+pypdf
+python-docx
+python-dotenv
+google-api-python-client
+google-auth
+huggingface_hub
+transformers
+torch

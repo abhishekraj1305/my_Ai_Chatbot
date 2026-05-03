@@ -1,0 +1,14 @@
+__pycache__/
+.env
+.env.local
+vector_db/
+*.pyc
+*.log
+.DS_Store
+data/bookings.json
+data/booking_notifications.log
+data/github_repos_cache.json
+data/test_bookings.tmp.json
+
+# Keep data/ tracked for now so the portfolio Space can ingest documents.
+# If documents are private, remove them before publishing or add data/ here.
