@@ -11,6 +11,8 @@ import json
 import os
 import re
 import smtplib
+import urllib.error
+import urllib.request
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from email.message import EmailMessage
@@ -50,6 +52,14 @@ def _env_value(name: str) -> str:
 
 def smtp_is_configured() -> bool:
     return all(_env_value(name) for name in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"))
+
+
+def http_email_is_configured() -> bool:
+    return bool(_env_value("EMAIL_WEBHOOK_URL") or _env_value("RESEND_API_KEY"))
+
+
+def email_is_configured() -> bool:
+    return http_email_is_configured() or smtp_is_configured()
 
 
 def owner_email() -> str:
@@ -289,12 +299,81 @@ def _send_email_once(subject: str, body: str, to_email: str, port: int) -> bool:
 
 def _send_email(subject: str, body: str, to_email: str) -> bool:
     errors = []
+    if http_email_is_configured():
+        try:
+            return _send_email_http(subject, body, to_email)
+        except Exception as exc:
+            errors.append(f"http email: {type(exc).__name__}: {exc}")
+
     for port in _smtp_ports():
         try:
             return _send_email_once(subject, body, to_email, port)
         except Exception as exc:
             errors.append(f"port {port}: {type(exc).__name__}: {exc}")
     raise RuntimeError("; ".join(errors))
+
+
+def _post_json(url: str, payload: Dict, headers: Dict | None = None) -> Dict:
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            **(headers or {}),
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+            if not raw:
+                return {}
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return {"raw": raw}
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
+
+
+def _send_email_http(subject: str, body: str, to_email: str) -> bool:
+    webhook_url = _env_value("EMAIL_WEBHOOK_URL")
+    webhook_secret = _env_value("EMAIL_WEBHOOK_SECRET")
+    from_email = _env_value("EMAIL_FROM") or _env_value("RESEND_FROM_EMAIL") or owner_email()
+
+    if webhook_url:
+        headers = {}
+        if webhook_secret:
+            headers["Authorization"] = f"Bearer {webhook_secret}"
+        _post_json(
+            webhook_url,
+            {
+                "subject": subject,
+                "body": body,
+                "to": to_email,
+                "from": from_email,
+            },
+            headers=headers,
+        )
+        return True
+
+    resend_key = _env_value("RESEND_API_KEY")
+    if resend_key:
+        _post_json(
+            "https://api.resend.com/emails",
+            {
+                "from": from_email,
+                "to": [to_email],
+                "subject": subject,
+                "text": body,
+            },
+            headers={"Authorization": f"Bearer {resend_key}"},
+        )
+        return True
+
+    return False
 
 
 def _friendly_notification_error(errors: List[str]) -> str:
@@ -317,9 +396,9 @@ def notify_booking(booking: Dict) -> Dict:
         f"Meeting: {booking['meeting_link']}\n"
     )
     notification_errors = []
-    configured = smtp_is_configured()
+    configured = email_is_configured()
     if not configured:
-        notification_errors.append("SMTP credentials are not configured in the runtime environment.")
+        notification_errors.append("Email credentials are not configured in the runtime environment.")
 
     try:
         owner_sent = _send_email("New chatbot booking request", body, owner_email())
@@ -354,6 +433,8 @@ def notify_booking(booking: Dict) -> Dict:
 
     return {
         "smtp_configured": configured,
+        "email_configured": configured,
+        "http_email_configured": http_email_is_configured(),
         "owner_email_sent": owner_sent,
         "visitor_email_sent": visitor_sent,
         "errors": notification_errors,
