@@ -19,12 +19,20 @@ from typing import Dict, List
 from zoneinfo import ZoneInfo
 
 try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover
+    load_dotenv = None
+
+try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 except ImportError:  # Optional dependency for deployed calendar sync.
     service_account = None
     build = None
 
+
+if load_dotenv:
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 TIMEZONE = ZoneInfo(os.getenv("BOOKING_TIMEZONE", "Asia/Kolkata"))
 BOOKINGS_PATH = Path(
@@ -34,6 +42,14 @@ BOOKINGS_PATH = Path(
     )
 )
 OWNER_EMAIL = os.getenv("OWNER_EMAIL", "r.abhishek1305@gmail.com")
+
+
+def _env_value(name: str) -> str:
+    return (os.getenv(name) or "").strip()
+
+
+def smtp_is_configured() -> bool:
+    return all(_env_value(name) for name in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"))
 
 
 def _load_bookings() -> List[Dict]:
@@ -232,20 +248,20 @@ def available_slots(date_text: str, limit: int = 12) -> List[str]:
 
 
 def _send_email(subject: str, body: str, to_email: str) -> bool:
-    host = os.getenv("SMTP_HOST")
-    user = os.getenv("SMTP_USER")
-    password = os.getenv("SMTP_PASSWORD")
+    host = _env_value("SMTP_HOST")
+    user = _env_value("SMTP_USER")
+    password = _env_value("SMTP_PASSWORD")
     if not host or not user or not password:
         return False
 
-    port = int(os.getenv("SMTP_PORT", "587"))
+    port = int(_env_value("SMTP_PORT") or "587")
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = user
     message["To"] = to_email
     message.set_content(body)
 
-    with smtplib.SMTP(host, port, timeout=20) as server:
+    with smtplib.SMTP(host, port, timeout=25) as server:
         server.starttls()
         server.login(user, password)
         server.send_message(message)
@@ -262,6 +278,9 @@ def notify_booking(booking: Dict) -> Dict:
         f"Meeting: {booking['meeting_link']}\n"
     )
     notification_errors = []
+    configured = smtp_is_configured()
+    if not configured:
+        notification_errors.append("SMTP credentials are not configured in the runtime environment.")
 
     try:
         owner_sent = _send_email("New chatbot booking request", body, OWNER_EMAIL)
@@ -293,6 +312,7 @@ def notify_booking(booking: Dict) -> Dict:
             notification_errors.append(f"local notification log failed: {exc}")
 
     return {
+        "smtp_configured": configured,
         "owner_email_sent": owner_sent,
         "visitor_email_sent": visitor_sent,
         "errors": notification_errors,
