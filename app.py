@@ -988,6 +988,42 @@ if __name__ == "__main__":
             min-height: 320px !important;
             padding: 16px 12px 12px;
           }
+          .mini-bot-row {
+            min-height: 58px;
+            justify-content: flex-end;
+            margin-top: -10px;
+            padding-right: 16px;
+          }
+          #mini-bot {
+            width: 58px;
+            height: 54px;
+          }
+          .bot-emoji {
+            width: 38px;
+            height: 38px;
+            margin-top: 12px;
+            border-radius: 14px;
+            font-size: 1.25rem;
+            box-shadow: 0 8px 18px rgba(126, 34, 206, 0.18);
+          }
+          .bot-speech {
+            right: 28px;
+            top: 1px;
+            min-width: 44px;
+            height: 22px;
+            padding: 3px 6px;
+            font-size: 0.62rem;
+            border-radius: 10px 10px 4px 10px;
+          }
+          .bot-speech span {
+            left: 6px;
+            right: 6px;
+          }
+          .bot-shadow {
+            width: 24px;
+            height: 6px;
+            margin-top: 2px;
+          }
           .msg-row.user {
             max-width: 86%;
           }

@@ -261,19 +261,42 @@ def notify_booking(booking: Dict) -> Dict:
         f"Purpose: {booking['purpose']}\n"
         f"Meeting: {booking['meeting_link']}\n"
     )
-    owner_sent = _send_email("New chatbot booking request", body, OWNER_EMAIL)
-    visitor_sent = _send_email(
-        "Your call request with Abhishek",
-        "Thanks for requesting a call with Abhishek.\n\n" + body,
-        booking["email"],
-    )
+    notification_errors = []
+
+    try:
+        owner_sent = _send_email("New chatbot booking request", body, OWNER_EMAIL)
+    except Exception as exc:
+        owner_sent = False
+        notification_errors.append(f"owner email failed: {exc}")
+
+    try:
+        visitor_sent = _send_email(
+            "Your call request with Abhishek",
+            "Thanks for requesting a call with Abhishek.\n\n" + body,
+            booking["email"],
+        )
+    except Exception as exc:
+        visitor_sent = False
+        notification_errors.append(f"visitor email failed: {exc}")
 
     if not owner_sent:
-        log_path = BOOKINGS_PATH.parent / "booking_notifications.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(f"\n--- {datetime.now(TIMEZONE).isoformat()} ---\n{body}\n")
+        try:
+            log_path = BOOKINGS_PATH.parent / "booking_notifications.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(f"\n--- {datetime.now(TIMEZONE).isoformat()} ---\n{body}\n")
+                if notification_errors:
+                    handle.write("Notification errors:\n")
+                    for error in notification_errors:
+                        handle.write(f"- {error}\n")
+        except Exception as exc:
+            notification_errors.append(f"local notification log failed: {exc}")
 
-    return {"owner_email_sent": owner_sent, "visitor_email_sent": visitor_sent}
+    return {
+        "owner_email_sent": owner_sent,
+        "visitor_email_sent": visitor_sent,
+        "errors": notification_errors,
+    }
 
 
 def create_booking(details: Dict) -> Dict:
@@ -300,9 +323,16 @@ def create_booking(details: Dict) -> Dict:
         "status": "requested",
         "created_at": datetime.now(TIMEZONE).isoformat(),
     }
-    bookings = _load_bookings()
-    bookings.append(booking)
-    _save_bookings(bookings)
+    try:
+        bookings = _load_bookings()
+        bookings.append(booking)
+        _save_bookings(bookings)
+    except Exception as exc:
+        return {
+            "created": False,
+            "reason": "storage_error",
+            "message": f"Could not save the booking request: {exc}",
+        }
     booking["calendar_event_link"] = _create_google_calendar_event(booking)
     booking["notifications"] = notify_booking(booking)
     booking["created"] = True

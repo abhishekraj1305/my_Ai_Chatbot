@@ -248,6 +248,14 @@ def update_booking_state(message: str, state: Dict | None) -> Tuple[str, Dict]:
 
     booking = create_booking(details)
     if not booking.get("created"):
+        if booking.get("reason") == "storage_error":
+            state["active"] = True
+            state["step"] = "purpose"
+            return (
+                "I collected the booking details, but could not save the request right now. "
+                "Please try again in a moment, or contact Abhishek directly from the contact section.",
+                state,
+            )
         if booking.get("reason") == "parse_error":
             state["active"] = True
             _reset_invalid_slot_details(state, booking.get("message", ""))
