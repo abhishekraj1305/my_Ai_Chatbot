@@ -250,7 +250,7 @@ def available_slots(date_text: str, limit: int = 12) -> List[str]:
 def _send_email(subject: str, body: str, to_email: str) -> bool:
     host = _env_value("SMTP_HOST")
     user = _env_value("SMTP_USER")
-    password = _env_value("SMTP_PASSWORD")
+    password = _env_value("SMTP_PASSWORD").replace(" ", "")
     if not host or not user or not password:
         return False
 
