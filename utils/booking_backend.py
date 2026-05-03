@@ -41,7 +41,7 @@ BOOKINGS_PATH = Path(
         str(Path(__file__).resolve().parents[1] / "data" / "bookings.json"),
     )
 )
-OWNER_EMAIL = os.getenv("OWNER_EMAIL", "r.abhishek1305@gmail.com")
+DEFAULT_OWNER_EMAIL = "r.abhishek1305@gmail.com"
 
 
 def _env_value(name: str) -> str:
@@ -50,6 +50,10 @@ def _env_value(name: str) -> str:
 
 def smtp_is_configured() -> bool:
     return all(_env_value(name) for name in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"))
+
+
+def owner_email() -> str:
+    return _env_value("OWNER_EMAIL") or DEFAULT_OWNER_EMAIL
 
 
 def _load_bookings() -> List[Dict]:
@@ -283,10 +287,11 @@ def notify_booking(booking: Dict) -> Dict:
         notification_errors.append("SMTP credentials are not configured in the runtime environment.")
 
     try:
-        owner_sent = _send_email("New chatbot booking request", body, OWNER_EMAIL)
+        owner_sent = _send_email("New chatbot booking request", body, owner_email())
     except Exception as exc:
         owner_sent = False
         notification_errors.append(f"owner email failed: {exc}")
+        print(f"[booking] owner email failed: {type(exc).__name__}: {exc}")
 
     try:
         visitor_sent = _send_email(
@@ -297,6 +302,7 @@ def notify_booking(booking: Dict) -> Dict:
     except Exception as exc:
         visitor_sent = False
         notification_errors.append(f"visitor email failed: {exc}")
+        print(f"[booking] visitor email failed: {type(exc).__name__}: {exc}")
 
     if not owner_sent:
         try:
@@ -355,5 +361,17 @@ def create_booking(details: Dict) -> Dict:
         }
     booking["calendar_event_link"] = _create_google_calendar_event(booking)
     booking["notifications"] = notify_booking(booking)
+    booking["notification_errors"] = booking["notifications"].get("errors", [])
     booking["created"] = True
+    try:
+        bookings = _load_bookings()
+        for index, item in enumerate(bookings):
+            if item.get("id") == booking["id"]:
+                bookings[index] = booking
+                break
+        _save_bookings(bookings)
+    except Exception as exc:
+        booking.setdefault("notification_errors", []).append(
+            f"booking notification status update failed: {exc}"
+        )
     return booking

@@ -280,7 +280,7 @@ def render_admin_bookings(pin: str) -> str:
     if not expected_pin:
         return (
             "<div class='admin-card'>"
-            "<h3>Admin booking alerts are local right now</h3>"
+            "<h3>Admin booking portal</h3>"
             "<p>Set <code>ADMIN_PIN</code> in <code>.env</code> to enable this protected dashboard.</p>"
             f"<p>Until email is configured, booking alerts are saved in <code>{html.escape(str(BOOKINGS_PATH))}</code> and "
             f"<code>{html.escape(str(BOOKINGS_PATH.parent / 'booking_notifications.log'))}</code>.</p>"
@@ -289,8 +289,8 @@ def render_admin_bookings(pin: str) -> str:
     if (pin or "").strip() != expected_pin:
         return (
             "<div class='admin-card'>"
-            "<h3>Admin dashboard locked</h3>"
-            "<p>Enter your admin PIN and click refresh to view booking requests.</p>"
+            "<h3>Admin booking portal locked</h3>"
+            "<p>Enter the PIN from <code>ADMIN_PIN</code> in your runtime environment, then click unlock.</p>"
             "</div>"
         )
 
@@ -299,13 +299,26 @@ def render_admin_bookings(pin: str) -> str:
         return (
             "<div class='admin-card'>"
             "<h3>No bookings yet</h3>"
-            "<p>When someone books a call, it will appear here with the slot, purpose, and Jitsi link.</p>"
+            "<p>When someone books a call, it will appear here with the slot, visitor email, purpose, Jitsi link, and email status.</p>"
             "</div>"
         )
 
     rows = []
-    for booking in bookings:
+    for booking in reversed(bookings):
         meeting_link = html.escape(booking.get("meeting_link", ""))
+        notifications = booking.get("notifications") or {}
+        owner_sent = notifications.get("owner_email_sent")
+        visitor_sent = notifications.get("visitor_email_sent")
+        errors = booking.get("notification_errors") or notifications.get("errors") or []
+        if owner_sent and visitor_sent:
+            mail_status = "Owner + visitor sent"
+        elif owner_sent:
+            mail_status = "Owner sent"
+        elif notifications.get("smtp_configured"):
+            mail_status = "Email failed"
+        else:
+            mail_status = "SMTP missing"
+        error_text = "; ".join(str(error) for error in errors)
         rows.append(
             "<tr>"
             f"<td>{html.escape(booking.get('slot_label', '-'))}</td>"
@@ -313,16 +326,17 @@ def render_admin_bookings(pin: str) -> str:
             f"<td>{html.escape(booking.get('email', '-'))}</td>"
             f"<td>{html.escape(booking.get('purpose', '-'))}</td>"
             f"<td><a href='{meeting_link}' target='_blank' rel='noreferrer'>Join</a></td>"
-            f"<td>{html.escape(booking.get('status', 'requested'))}</td>"
+            f"<td><span class='mail-status'>{html.escape(mail_status)}</span>"
+            f"{'<small>' + html.escape(error_text) + '</small>' if error_text else ''}</td>"
             "</tr>"
         )
 
     return (
         "<div class='admin-card'>"
-        "<h3>Booking requests</h3>"
-        "<p>These are the chatbot bookings, sorted by meeting time. Jitsi itself will not show this schedule.</p>"
+        "<h3>Admin booking portal</h3>"
+        "<p>Latest requests are shown first. The meeting link is generated immediately; email status shows whether SMTP sent successfully.</p>"
         "<table class='admin-table'>"
-        "<thead><tr><th>Slot</th><th>Name</th><th>Email</th><th>Purpose</th><th>Meet</th><th>Status</th></tr></thead>"
+        "<thead><tr><th>Slot</th><th>Name</th><th>Email</th><th>Purpose</th><th>Meet</th><th>Email status</th></tr></thead>"
         "<tbody>"
         + "".join(rows)
         + "</tbody></table></div>"
@@ -364,7 +378,7 @@ with gr.Blocks(title=TITLE) as demo:
             )
             send = gr.Button("Send", scale=1, min_width=82, elem_id="send-button")
 
-        with gr.Accordion("Admin bookings", open=False, elem_id="admin-panel"):
+        with gr.Accordion("Admin booking portal", open=False, elem_id="admin-panel"):
             with gr.Row(elem_id="admin-controls"):
                 admin_pin = gr.Textbox(
                     placeholder="Admin PIN",
@@ -374,7 +388,7 @@ with gr.Blocks(title=TITLE) as demo:
                     container=False,
                     elem_id="admin-pin",
                 )
-                refresh_admin = gr.Button("Refresh", elem_id="admin-refresh")
+                refresh_admin = gr.Button("Unlock / Refresh", elem_id="admin-refresh")
             admin_bookings = gr.HTML(render_admin_bookings(""), elem_id="admin-bookings")
 
         textbox_submit_event = textbox.submit(
