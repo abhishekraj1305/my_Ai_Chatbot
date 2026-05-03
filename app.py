@@ -252,9 +252,10 @@ with gr.Blocks(title=TITLE) as demo:
 
 
 if __name__ == "__main__":
+    is_space = bool(os.getenv("SPACE_ID") or os.getenv("SPACE_HOST"))
     demo.launch(
-        server_name="127.0.0.1",
-        server_port=7860,
+        server_name=os.getenv("GRADIO_SERVER_NAME", "0.0.0.0" if is_space else "127.0.0.1"),
+        server_port=int(os.getenv("PORT", os.getenv("GRADIO_SERVER_PORT", "7860"))),
         theme=gr.themes.Soft(primary_hue="purple", secondary_hue="violet"),
         css="""
         :root {
