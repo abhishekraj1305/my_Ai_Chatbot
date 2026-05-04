@@ -378,13 +378,7 @@ with gr.Blocks(title=TITLE) as demo:
             )
             send = gr.Button("Send", scale=1, min_width=82, elem_id="send-button")
 
-        with gr.Column(elem_id="admin-panel"):
-            gr.HTML(
-                "<div class='admin-panel-header'>"
-                "<strong>Admin bookings</strong>"
-                "<span>Enter PIN to view booking requests</span>"
-                "</div>"
-            )
+        with gr.Accordion("Admin bookings", open=False, elem_id="admin-panel"):
             with gr.Row(elem_id="admin-controls"):
                 admin_pin = gr.Textbox(
                     placeholder="Admin PIN",
@@ -487,7 +481,7 @@ if __name__ == "__main__":
           margin: auto !important;
           padding: 0 8px 8px !important;
           height: 100dvh !important;
-          overflow-y: auto !important;
+          overflow: hidden !important;
           overflow-x: hidden !important;
         }
         .html-container,
@@ -504,7 +498,7 @@ if __name__ == "__main__":
           gap: 7px;
           display: flex !important;
           flex-direction: column !important;
-          overflow-y: auto !important;
+          overflow: hidden !important;
           overflow-x: hidden !important;
           position: relative !important;
         }
@@ -869,30 +863,7 @@ if __name__ == "__main__":
           flex: 0 0 auto !important;
           margin-top: 0 !important;
           overflow: hidden !important;
-          display: block !important;
-          min-height: 48px !important;
           box-shadow: 0 8px 22px rgba(88, 28, 135, 0.08) !important;
-        }
-        #admin-panel > div {
-          padding: 0 !important;
-        }
-        .admin-panel-header {
-          min-height: 46px;
-          padding: 10px 14px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          color: var(--muted);
-          border-bottom: 1px solid rgba(168, 85, 247, 0.12);
-        }
-        .admin-panel-header strong {
-          color: #581c87;
-          font-size: 0.95rem;
-        }
-        .admin-panel-header span {
-          color: var(--muted);
-          font-size: 0.78rem;
         }
         #admin-controls {
           gap: 8px;
@@ -956,11 +927,16 @@ if __name__ == "__main__":
         #admin-panel summary,
         #admin-panel .label-wrap {
           color: var(--muted) !important;
-          font-weight: 700 !important;
+          font-weight: 500 !important;
         }
         #admin-panel summary {
           min-height: 44px !important;
           padding: 0 14px !important;
+          background: white !important;
+          border-radius: 15px !important;
+        }
+        #admin-panel summary svg {
+          color: var(--muted) !important;
         }
         #composer,
         #composer textarea {
