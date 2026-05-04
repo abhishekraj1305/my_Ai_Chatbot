@@ -378,7 +378,7 @@ with gr.Blocks(title=TITLE) as demo:
             )
             send = gr.Button("Send", scale=1, min_width=82, elem_id="send-button")
 
-        with gr.Accordion("Admin booking portal", open=False, elem_id="admin-panel"):
+        with gr.Accordion("Admin bookings", open=False, elem_id="admin-panel"):
             with gr.Row(elem_id="admin-controls"):
                 admin_pin = gr.Textbox(
                     placeholder="Admin PIN",
@@ -494,7 +494,7 @@ if __name__ == "__main__":
         }
         #chat-shell {
           height: 100dvh;
-          gap: 8px;
+          gap: 7px;
           display: flex !important;
           flex-direction: column !important;
           overflow: hidden !important;
@@ -531,7 +531,7 @@ if __name__ == "__main__":
           flex: 1 1 auto !important;
           height: auto !important;
           max-height: none !important;
-          min-height: 300px !important;
+          min-height: 220px !important;
           overflow-y: auto !important;
           overflow-x: hidden !important;
           padding: 18px 26px 14px;
@@ -860,10 +860,16 @@ if __name__ == "__main__":
           border-radius: 15px !important;
           background: white !important;
           flex: 0 0 auto !important;
+          margin-top: 0 !important;
+          overflow: hidden !important;
+        }
+        #admin-panel > div {
+          padding: 0 !important;
         }
         #admin-controls {
           gap: 8px;
           align-items: stretch;
+          padding: 10px 12px 8px !important;
         }
         #admin-pin,
         #admin-pin input {
@@ -876,6 +882,11 @@ if __name__ == "__main__":
           background: var(--accent-strong) !important;
           color: white !important;
           border: none !important;
+        }
+        #admin-bookings {
+          max-height: min(42dvh, 320px) !important;
+          overflow-y: auto !important;
+          padding: 0 12px 12px !important;
         }
         .admin-card {
           background: #fbf8ff;
@@ -918,6 +929,10 @@ if __name__ == "__main__":
         #admin-panel .label-wrap {
           color: var(--muted) !important;
           font-weight: 700 !important;
+        }
+        #admin-panel summary {
+          min-height: 44px !important;
+          padding: 0 14px !important;
         }
         #composer,
         #composer textarea {
@@ -999,7 +1014,7 @@ if __name__ == "__main__":
           #conversation-window {
             height: auto !important;
             max-height: none !important;
-            min-height: 320px !important;
+            min-height: 210px !important;
             padding: 16px 12px 12px;
           }
           .mini-bot-row {
