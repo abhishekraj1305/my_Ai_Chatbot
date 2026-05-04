@@ -303,7 +303,7 @@ def render_admin_bookings(pin: str) -> str:
             "</div>"
         )
 
-    rows = []
+    cards = []
     for booking in reversed(bookings):
         meeting_link = html.escape(booking.get("meeting_link", ""))
         notifications = booking.get("notifications") or {}
@@ -319,27 +319,30 @@ def render_admin_bookings(pin: str) -> str:
         else:
             mail_status = "SMTP missing"
         error_text = "; ".join(str(error) for error in errors)
-        rows.append(
-            "<tr>"
-            f"<td>{html.escape(booking.get('slot_label', '-'))}</td>"
-            f"<td>{html.escape(booking.get('name', '-'))}</td>"
-            f"<td>{html.escape(booking.get('email', '-'))}</td>"
-            f"<td>{html.escape(booking.get('purpose', '-'))}</td>"
-            f"<td><a href='{meeting_link}' target='_blank' rel='noreferrer'>Join</a></td>"
-            f"<td><span class='mail-status'>{html.escape(mail_status)}</span>"
-            f"{'<small>' + html.escape(error_text) + '</small>' if error_text else ''}</td>"
-            "</tr>"
+        cards.append(
+            "<article class='booking-card'>"
+            "<div class='booking-card-top'>"
+            f"<strong>{html.escape(booking.get('slot_label', '-'))}</strong>"
+            f"<span>{html.escape(booking.get('status', 'requested'))}</span>"
+            "</div>"
+            f"<p><b>Name</b>{html.escape(booking.get('name', '-'))}</p>"
+            f"<p><b>Email</b>{html.escape(booking.get('email', '-'))}</p>"
+            f"<p><b>Purpose</b>{html.escape(booking.get('purpose', '-'))}</p>"
+            "<div class='booking-card-actions'>"
+            f"<a href='{meeting_link}' target='_blank' rel='noreferrer'>Open meeting</a>"
+            f"<span class='mail-status'>{html.escape(mail_status)}</span>"
+            "</div>"
+            f"{'<small>' + html.escape(error_text) + '</small>' if error_text else ''}"
+            "</article>"
         )
 
     return (
         "<div class='admin-card'>"
-        "<h3>Admin booking portal</h3>"
-        "<p>Latest requests are shown first. The meeting link is generated immediately; email status shows whether SMTP sent successfully.</p>"
-        "<table class='admin-table'>"
-        "<thead><tr><th>Slot</th><th>Name</th><th>Email</th><th>Purpose</th><th>Meet</th><th>Email status</th></tr></thead>"
-        "<tbody>"
-        + "".join(rows)
-        + "</tbody></table></div>"
+        "<h3>All bookings</h3>"
+        "<p>Latest requests are shown first. Open the meeting link directly from each card.</p>"
+        "<div class='booking-card-list'>"
+        + "".join(cards)
+        + "</div></div>"
     )
 
 
@@ -431,7 +434,18 @@ with gr.Blocks(title=TITLE) as demo:
                 queue=False,
                 show_progress="hidden",
             )
-        refresh_admin.click(render_admin_bookings, inputs=[admin_pin], outputs=[admin_bookings])
+        admin_refresh_event = refresh_admin.click(
+            render_admin_bookings, inputs=[admin_pin], outputs=[admin_bookings]
+        )
+        admin_refresh_event.then(
+            fn=noop,
+            inputs=None,
+            outputs=None,
+            js="() => setTimeout(() => document.querySelector('#admin-bookings')?.scrollIntoView({block: 'nearest'}), 80)",
+            queue=False,
+            show_progress="hidden",
+        )
+        admin_pin.submit(render_admin_bookings, inputs=[admin_pin], outputs=[admin_bookings])
 
 
 if __name__ == "__main__":
@@ -864,11 +878,17 @@ if __name__ == "__main__":
           margin-top: 0 !important;
           overflow: hidden !important;
           box-shadow: 0 8px 22px rgba(88, 28, 135, 0.08) !important;
+          position: relative !important;
+          z-index: 20 !important;
+          pointer-events: auto !important;
         }
         #admin-controls {
           gap: 8px;
           align-items: stretch;
           padding: 10px 12px 8px !important;
+          position: relative !important;
+          z-index: 22 !important;
+          pointer-events: auto !important;
         }
         #admin-pin,
         #admin-pin input {
@@ -881,9 +901,16 @@ if __name__ == "__main__":
           background: var(--accent-strong) !important;
           color: white !important;
           border: none !important;
+          min-height: 44px !important;
+          width: 100% !important;
+          cursor: pointer !important;
+          pointer-events: auto !important;
+          position: relative !important;
+          z-index: 24 !important;
         }
         #admin-bookings {
-          max-height: min(42dvh, 320px) !important;
+          min-height: 92px !important;
+          max-height: min(42dvh, 360px) !important;
           overflow-y: auto !important;
           padding: 0 12px 12px !important;
         }
@@ -923,6 +950,64 @@ if __name__ == "__main__":
         .admin-table a {
           color: var(--accent-strong);
           font-weight: 800;
+        }
+        .booking-card-list {
+          display: grid;
+          gap: 10px;
+        }
+        .booking-card {
+          background: white;
+          border: 1px solid rgba(168, 85, 247, 0.24);
+          border-radius: 12px;
+          padding: 12px;
+          box-shadow: 0 8px 18px rgba(88, 28, 135, 0.06);
+        }
+        .booking-card-top,
+        .booking-card-actions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .booking-card-top strong {
+          color: #581c87;
+          font-size: 0.9rem;
+        }
+        .booking-card-top span,
+        .mail-status {
+          border: 1px solid rgba(168, 85, 247, 0.26);
+          border-radius: 999px;
+          padding: 3px 8px;
+          color: #581c87;
+          font-size: 0.72rem;
+          font-weight: 800;
+          background: #fbf8ff;
+        }
+        .booking-card p {
+          margin: 8px 0 0;
+          display: grid;
+          grid-template-columns: 64px minmax(0, 1fr);
+          gap: 8px;
+          color: var(--text);
+          overflow-wrap: anywhere;
+        }
+        .booking-card p b {
+          color: var(--muted);
+        }
+        .booking-card-actions {
+          margin-top: 10px;
+        }
+        .booking-card-actions a {
+          color: var(--accent-strong);
+          font-weight: 850;
+          text-decoration: none;
+        }
+        .booking-card small {
+          display: block;
+          margin-top: 8px;
+          color: #b91c1c;
+          overflow-wrap: anywhere;
         }
         #admin-panel summary,
         #admin-panel .label-wrap {
