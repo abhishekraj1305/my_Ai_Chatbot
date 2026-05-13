@@ -281,18 +281,11 @@ def update_booking_state(message: str, state: Dict | None) -> Tuple[str, Dict]:
     state["active"] = False
     notifications = booking.get("notifications", {})
     if notifications.get("owner_email_sent") and notifications.get("visitor_email_sent"):
-        notification_note = "Abhishek and the visitor have been notified by email."
+        notification_note = "A confirmation email has been sent."
     elif notifications.get("owner_email_sent"):
-        notification_note = "Abhishek has been notified by email. Visitor confirmation email could not be sent."
-    elif notifications.get("smtp_configured"):
-        notification_note = (
-            notifications.get("friendly_error")
-            or "Booking saved, but the email notification failed. Admin alert was saved locally for review."
-        )
+        notification_note = "Abhishek has been notified by email."
     else:
-        notification_note = (
-            "Booking saved locally. Add SMTP secrets in the runtime environment to enable email alerts."
-        )
+        notification_note = "Your request is saved. Abhishek will confirm the call directly."
     response = (
         "Booked request received.\n\n"
         f"- Name: {booking['name']}\n"

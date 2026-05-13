@@ -44,6 +44,8 @@ BOOKINGS_PATH = Path(
     )
 )
 DEFAULT_OWNER_EMAIL = "r.abhishek1305@gmail.com"
+SMTP_TIMEOUT_SECONDS = int(os.getenv("SMTP_TIMEOUT_SECONDS", "6"))
+HTTP_EMAIL_TIMEOUT_SECONDS = int(os.getenv("HTTP_EMAIL_TIMEOUT_SECONDS", "8"))
 
 
 def _env_value(name: str) -> str:
@@ -60,6 +62,12 @@ def http_email_is_configured() -> bool:
 
 def email_is_configured() -> bool:
     return http_email_is_configured() or smtp_is_configured()
+
+
+def hosted_space_blocks_smtp() -> bool:
+    """Hugging Face Spaces commonly block outbound SMTP; avoid slow retries."""
+    is_space = bool(os.getenv("SPACE_ID") or os.getenv("SPACE_HOST"))
+    return is_space and smtp_is_configured() and not http_email_is_configured()
 
 
 def owner_email() -> str:
@@ -285,9 +293,9 @@ def _send_email_once(subject: str, body: str, to_email: str, port: int) -> bool:
     message.set_content(body)
 
     if port == 465:
-        server_context = smtplib.SMTP_SSL(host, port, timeout=25)
+        server_context = smtplib.SMTP_SSL(host, port, timeout=SMTP_TIMEOUT_SECONDS)
     else:
-        server_context = smtplib.SMTP(host, port, timeout=25)
+        server_context = smtplib.SMTP(host, port, timeout=SMTP_TIMEOUT_SECONDS)
 
     with server_context as server:
         if port != 465:
@@ -325,7 +333,7 @@ def _post_json(url: str, payload: Dict, headers: Dict | None = None) -> Dict:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=25) as response:
+        with urllib.request.urlopen(request, timeout=HTTP_EMAIL_TIMEOUT_SECONDS) as response:
             raw = response.read().decode("utf-8", errors="replace")
             if not raw:
                 return {}
@@ -400,6 +408,21 @@ def notify_booking(booking: Dict) -> Dict:
     if not configured:
         notification_errors.append("Email credentials are not configured in the runtime environment.")
 
+    if hosted_space_blocks_smtp():
+        notification_errors.append(
+            "SMTP delivery skipped on hosted Space. Configure RESEND_API_KEY or EMAIL_WEBHOOK_URL for live email."
+        )
+        _write_notification_log(body, notification_errors)
+        return {
+            "smtp_configured": configured,
+            "email_configured": configured,
+            "http_email_configured": False,
+            "owner_email_sent": False,
+            "visitor_email_sent": False,
+            "errors": notification_errors,
+            "friendly_error": _friendly_notification_error(notification_errors),
+        }
+
     try:
         owner_sent = _send_email("New chatbot booking request", body, owner_email())
     except Exception as exc:
@@ -419,17 +442,7 @@ def notify_booking(booking: Dict) -> Dict:
         print(f"[booking] visitor email failed: {type(exc).__name__}: {exc}")
 
     if not owner_sent:
-        try:
-            log_path = BOOKINGS_PATH.parent / "booking_notifications.log"
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            with log_path.open("a", encoding="utf-8") as handle:
-                handle.write(f"\n--- {datetime.now(TIMEZONE).isoformat()} ---\n{body}\n")
-                if notification_errors:
-                    handle.write("Notification errors:\n")
-                    for error in notification_errors:
-                        handle.write(f"- {error}\n")
-        except Exception as exc:
-            notification_errors.append(f"local notification log failed: {exc}")
+        _write_notification_log(body, notification_errors)
 
     return {
         "smtp_configured": configured,
@@ -442,6 +455,20 @@ def notify_booking(booking: Dict) -> Dict:
         if notification_errors
         else "",
     }
+
+
+def _write_notification_log(body: str, notification_errors: List[str]) -> None:
+    try:
+        log_path = BOOKINGS_PATH.parent / "booking_notifications.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(f"\n--- {datetime.now(TIMEZONE).isoformat()} ---\n{body}\n")
+            if notification_errors:
+                handle.write("Notification errors:\n")
+                for error in notification_errors:
+                    handle.write(f"- {error}\n")
+    except Exception as exc:
+        notification_errors.append(f"local notification log failed: {exc}")
 
 
 def create_booking(details: Dict) -> Dict:

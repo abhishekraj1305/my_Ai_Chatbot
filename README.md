@@ -185,7 +185,7 @@ BOOKING_TIMEZONE=Asia/Kolkata
 BOOKING_DURATION_MINUTES=30
 ```
 
-If SMTP is not configured, booking notifications are written to `data/booking_notifications.log`. If Google Calendar credentials are not configured, the app still prevents double booking locally.
+If email is not configured, booking notifications are written to `data/booking_notifications.log`. On Hugging Face Spaces, SMTP may be blocked, so the app skips slow SMTP attempts there unless `EMAIL_WEBHOOK_URL` or `RESEND_API_KEY` is configured. If Google Calendar credentials are not configured, the app still prevents double booking locally.
 
 For Gmail SMTP, create a Gmail App Password and use that as `SMTP_PASSWORD`; do not use your normal Gmail password.
 

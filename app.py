@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import os
 import re
+from typing import Any
 
 import gradio as gr
 
@@ -239,10 +240,10 @@ def render_history(history: list[dict] | None) -> str:
 
 def respond(
     message: str, history: list[dict], booking_state: dict | None
-) -> tuple[str, list[dict], str, dict | None]:
+) -> tuple[str, list[dict], str, dict | None, Any]:
     message = (message or "").strip()
     if not message:
-        return "", history, render_history(history), booking_state
+        return "", history, render_history(history), booking_state, gr.update()
 
     if booking_state and booking_state.get("active"):
         answer, booking_state = update_booking_state(message, booking_state)
@@ -256,19 +257,19 @@ def respond(
         {"role": "user", "content": message},
         {"role": "assistant", "content": answer},
     ]
-    return "", history, render_history(history), booking_state
+    return "", history, render_history(history), booking_state, gr.update(visible=False)
 
 
 def use_example(
     question: str, history: list[dict], booking_state: dict | None
-) -> tuple[str, list[dict], str, dict | None]:
+) -> tuple[str, list[dict], str, dict | None, Any]:
     if booking_state and booking_state.get("active") and not is_appointment_intent(question):
         booking_state = None
     return respond(question, history, booking_state)
 
 
-def clear_chat() -> tuple[list[dict], str, dict | None]:
-    return [], render_history([]), None
+def clear_chat() -> tuple[list[dict], str, dict | None, Any]:
+    return [], render_history([]), None, gr.update(visible=True)
 
 
 def noop() -> None:
@@ -360,7 +361,7 @@ with gr.Blocks(title=TITLE) as demo:
         history_state = gr.State([])
         booking_state = gr.State(None)
         conversation = gr.HTML(render_history([]), elem_id="conversation-window")
-        with gr.Column(elem_id="suggestions-panel"):
+        with gr.Column(elem_id="suggestions-panel") as suggestions_panel:
             with gr.Row(elem_id="suggestions"):
                 example_buttons = [
                     gr.Button(question, elem_classes=["suggestion-chip"])
@@ -397,7 +398,7 @@ with gr.Blocks(title=TITLE) as demo:
         textbox_submit_event = textbox.submit(
             respond,
             [textbox, history_state, booking_state],
-            [textbox, history_state, conversation, booking_state],
+            [textbox, history_state, conversation, booking_state, suggestions_panel],
         )
         textbox_submit_event.then(
             fn=noop,
@@ -410,7 +411,7 @@ with gr.Blocks(title=TITLE) as demo:
         send_click_event = send.click(
             respond,
             [textbox, history_state, booking_state],
-            [textbox, history_state, conversation, booking_state],
+            [textbox, history_state, conversation, booking_state, suggestions_panel],
         )
         send_click_event.then(
             fn=noop,
@@ -424,7 +425,7 @@ with gr.Blocks(title=TITLE) as demo:
             example_click_event = button.click(
                 use_example,
                 inputs=[gr.State(question), history_state, booking_state],
-                outputs=[textbox, history_state, conversation, booking_state],
+                outputs=[textbox, history_state, conversation, booking_state, suggestions_panel],
             )
             example_click_event.then(
                 fn=noop,
