@@ -62,7 +62,7 @@ def fetch_github_projects(use_cache: bool = True) -> List[Dict]:
                 "User-Agent": "abhishek-portfolio-chatbot",
             },
         )
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=3) as response:
             repos = json.loads(response.read().decode("utf-8"))
         projects = [_repo_to_project(repo) for repo in repos if not repo.get("fork")]
         _save_cache(projects)
@@ -102,4 +102,3 @@ def summarize_github_projects(limit: int = 10) -> str:
         language = project["language"]
         lines.append(f"- {project['name']} ({language}): {description}")
     return "\n".join(lines)
-

@@ -6,7 +6,6 @@ import uuid
 from typing import List
 
 import chromadb
-from sentence_transformers import SentenceTransformer
 
 try:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -32,8 +31,10 @@ def _log(message: str) -> None:
     print(f"[ingest] {message}")
 
 
-def load_embedding_model() -> SentenceTransformer:
+def load_embedding_model():
     """Load embeddings from cache first, then allow download if needed."""
+    from sentence_transformers import SentenceTransformer
+
     try:
         return SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
     except Exception as local_exc:

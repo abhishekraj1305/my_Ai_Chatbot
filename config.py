@@ -29,11 +29,14 @@ EMBEDDING_MODEL = os.getenv(
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
 TOP_K = int(os.getenv("TOP_K", "4"))
+RETRIEVAL_BACKEND = os.getenv("RETRIEVAL_BACKEND", "vectorless").strip().lower()
 
-# Optional. If HF_TOKEN is present, rag_chain.py can call a Hugging Face model.
+# Optional. Remote generation is disabled by default for speed/reliability.
+# Set ENABLE_HF_GENERATION=1 and HF_TOKEN to use a Hugging Face model.
 # Llama models may require accepting the model license on Hugging Face first.
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_MODEL = os.getenv("HF_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
+ENABLE_HF_GENERATION = os.getenv("ENABLE_HF_GENERATION", "0") == "1"
 
 # Optional local text generation. Disabled by default because small CPU models
 # are often weaker than retrieval fallback and may need a separate download.

@@ -5,23 +5,24 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Tuple
 
-import chromadb
-from huggingface_hub import InferenceClient
-from transformers import pipeline
-
 from config import (
     COLLECTION_NAME,
+    ENABLE_HF_GENERATION,
     ENABLE_LOCAL_LLM,
     HF_MODEL,
     HF_TOKEN,
     LOCAL_LLM_MODEL,
+    RETRIEVAL_BACKEND,
     TOP_K,
     VECTOR_DB_DIR,
 )
-from ingest import rebuild_vector_db
-from ingest import load_embedding_model
 from github_projects import summarize_github_projects
 from utils.appointment import build_appointment_response, is_appointment_intent
+from vectorless_store import (
+    collection_records as vectorless_records,
+    list_sources as vectorless_sources,
+    retrieve as vectorless_retrieve,
+)
 
 
 SYSTEM_PROMPT = (
@@ -91,6 +92,8 @@ def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         try:
+            from ingest import load_embedding_model
+
             _embedding_model = load_embedding_model()
         except Exception as exc:
             _log(f"Embedding model loading failure: {exc}")
@@ -103,12 +106,16 @@ def get_collection(auto_ingest: bool = True):
     if _collection is not None:
         return _collection
 
+    import chromadb
+
     client = chromadb.PersistentClient(path=VECTOR_DB_DIR)
     try:
         _collection = client.get_collection(COLLECTION_NAME)
     except Exception:
         _log("ChromaDB collection missing.")
         if auto_ingest:
+            from ingest import rebuild_vector_db
+
             _log("Attempting one-time auto-ingestion from the data folder.")
             rebuild_vector_db()
             _collection = client.get_collection(COLLECTION_NAME)
@@ -119,6 +126,11 @@ def get_collection(auto_ingest: bool = True):
 
 
 def retrieve_context(question: str, top_k: int = TOP_K) -> Tuple[str, List[Dict]]:
+    if RETRIEVAL_BACKEND != "chroma":
+        context, retrieved = vectorless_retrieve(question, top_k)
+        _log(f"Number of vectorless chunks retrieved: {len(retrieved)}")
+        return context, retrieved
+
     model = get_embedding_model()
     collection = get_collection(auto_ingest=True)
 
@@ -153,6 +165,9 @@ def retrieve_context(question: str, top_k: int = TOP_K) -> Tuple[str, List[Dict]
 
 
 def list_indexed_sources() -> List[str]:
+    if RETRIEVAL_BACKEND != "chroma":
+        return vectorless_sources()
+
     collection = get_collection(auto_ingest=True)
     results = collection.get(include=["metadatas"])
     sources = []
@@ -164,6 +179,9 @@ def list_indexed_sources() -> List[str]:
 
 
 def _collection_records() -> List[Dict]:
+    if RETRIEVAL_BACKEND != "chroma":
+        return vectorless_records()
+
     collection = get_collection(auto_ingest=True)
     results = collection.get(include=["documents", "metadatas"])
     documents = results.get("documents", []) or []
@@ -407,11 +425,16 @@ def _is_document_inventory_question(question: str) -> bool:
 
 
 def _generate_with_hf(context: str, question: str) -> str | None:
+    if not ENABLE_HF_GENERATION:
+        return None
+
     if not HF_TOKEN:
         _log("HF_TOKEN missing; using retrieval fallback.")
         return None
 
     try:
+        from huggingface_hub import InferenceClient
+
         client = InferenceClient(model=HF_MODEL, token=HF_TOKEN)
         response = client.chat_completion(
             messages=[
@@ -450,6 +473,8 @@ def _generate_with_local_model(context: str, question: str) -> str | None:
 
     try:
         if _local_generator is None:
+            from transformers import pipeline
+
             _local_generator = pipeline("text-generation", model=LOCAL_LLM_MODEL)
         output = _local_generator(
             prompt,

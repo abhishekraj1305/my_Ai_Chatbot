@@ -23,11 +23,10 @@ Build a free, local-first RAG chatbot that answers questions about Abhishek from
 
 - Loads PDF, DOCX, TXT, and Markdown files.
 - Cleans text without stemming, lemmatization, stopword removal, or old NLP preprocessing.
-- Splits documents into semantic chunks.
-- Embeds chunks with `sentence-transformers/all-MiniLM-L6-v2`.
-- Stores vectors in persistent ChromaDB.
-- Retrieves top matching portfolio context.
-- Uses Hugging Face Inference API only when `HF_TOKEN` is available.
+- Splits documents into compact searchable chunks.
+- Uses fast vectorless BM25-style retrieval by default.
+- Avoids embedding downloads, Chroma startup, Torch, and Transformers on the live path.
+- Uses Hugging Face Inference API only when explicitly enabled.
 - Falls back to retrieval-based answers when no LLM is configured.
 - Includes a free appointment request flow with Jitsi links.
 
@@ -35,12 +34,9 @@ Build a free, local-first RAG chatbot that answers questions about Abhishek from
 
 - Python
 - Gradio
-- ChromaDB
-- LangChain text splitter
-- Sentence Transformers
+- Vectorless in-memory retrieval
 - pypdf
 - python-docx
-- Hugging Face Hub
 
 ## Folder Structure
 
@@ -65,7 +61,6 @@ chatbot/
 
 ```bash
 pip install -r requirements.txt
-python ingest.py
 python app.py
 ```
 
@@ -80,11 +75,8 @@ Place documents inside `data/`. Supported formats:
 - `.txt`
 - `.md`
 
-Run ingestion again after adding or editing documents:
-
-```bash
-python ingest.py
-```
+No ingestion step is required for the default vectorless mode. Restart the app
+after adding or editing documents so it rebuilds the in-memory index.
 
 ## Run the Chatbot
 
@@ -102,9 +94,10 @@ Suggested questions:
 
 ## Hugging Face Llama Option
 
-By default, the chatbot works without an LLM by using structured profile facts plus retrieval fallback. For better natural answers, set these environment variables locally or as Hugging Face Space secrets:
+By default, the chatbot works without a remote LLM by using structured profile facts plus fast retrieval fallback. This is faster and more reliable for the embedded live widget. For richer generated answers, install `huggingface_hub`, then set these environment variables locally or as Hugging Face Space secrets:
 
 ```bash
+ENABLE_HF_GENERATION=1
 HF_TOKEN=your_hugging_face_token
 HF_MODEL=meta-llama/Llama-3.1-8B-Instruct
 ```
@@ -118,13 +111,24 @@ Some Llama models require accepting the model license on Hugging Face before the
 3. Upload this folder's files.
 4. Make sure `app.py`, `requirements.txt`, `README.md`, and `data/` are included.
 5. The Space will install dependencies from `requirements.txt`.
-6. On first query, if `vector_db/` is missing, the app attempts to ingest the `data/` folder automatically.
+6. The app indexes documents in memory on first use; no vector database is required.
 
 Optional Hugging Face generation:
 
-1. Add a Space secret named `HF_TOKEN`.
-2. Optionally add `HF_MODEL` to choose a compatible text generation model.
-3. Without `HF_TOKEN`, the chatbot still works in retrieval fallback mode.
+1. Add `huggingface_hub` to `requirements.txt`.
+2. Add Space secrets named `ENABLE_HF_GENERATION=1` and `HF_TOKEN`.
+3. Optionally add `HF_MODEL` to choose a compatible text generation model.
+4. Without this, the chatbot still works in fast retrieval fallback mode.
+
+## Optional Chroma Backend
+
+The old vector database path is still available for experimentation. To use it,
+install `chromadb`, `langchain-text-splitters`, and `sentence-transformers`, set
+`RETRIEVAL_BACKEND=chroma`, then run:
+
+```bash
+python ingest.py
+```
 
 Do not commit private documents or secrets to a public repository.
 
