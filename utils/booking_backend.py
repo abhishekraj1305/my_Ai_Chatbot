@@ -40,7 +40,7 @@ TIMEZONE = ZoneInfo(os.getenv("BOOKING_TIMEZONE", "Asia/Kolkata"))
 BOOKINGS_PATH = Path(
     os.getenv(
         "BOOKINGS_PATH",
-        str(Path(__file__).resolve().parents[1] / "data" / "bookings.json"),
+        str(Path(__file__).resolve().parents[1] / "runtime_data" / "bookings.json"),
     )
 )
 DEFAULT_OWNER_EMAIL = "r.abhishek1305@gmail.com"

@@ -494,7 +494,7 @@ if __name__ == "__main__":
         .gradio-container {
           max-width: 780px !important;
           margin: auto !important;
-          padding: 0 8px 8px !important;
+          padding: 0 !important;
           height: 100dvh !important;
           overflow: hidden !important;
           overflow-x: hidden !important;
@@ -510,21 +510,17 @@ if __name__ == "__main__":
         }
         #chat-shell {
           height: 100dvh;
-          gap: 7px;
+          gap: 8px;
           display: flex !important;
           flex-direction: column !important;
           overflow: hidden !important;
           overflow-x: hidden !important;
           position: relative !important;
+          padding: 12px !important;
+          background: #f8f5ff !important;
         }
         .hero {
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 48%, #d946ef 100%);
-          margin: 0 -8px 0;
-          padding: 12px 16px 10px;
-          color: white;
-          overflow: hidden;
-          box-shadow: 0 0 28px var(--accent-glow);
-          flex: 0 0 auto !important;
+          display: none !important;
         }
         .hero h1 {
           margin: 0;
@@ -541,16 +537,16 @@ if __name__ == "__main__":
         }
         #conversation-window {
           border: none !important;
-          border-radius: 0 !important;
+          border-radius: 18px !important;
           background: var(--panel) !important;
-          box-shadow: none;
-          flex: 0 1 auto !important;
-          height: clamp(220px, calc(100dvh - 405px), 520px) !important;
-          max-height: clamp(220px, calc(100dvh - 405px), 520px) !important;
-          min-height: 180px !important;
+          box-shadow: 0 10px 28px rgba(88, 28, 135, 0.08);
+          flex: 1 1 auto !important;
+          height: auto !important;
+          max-height: none !important;
+          min-height: 0 !important;
           overflow-y: auto !important;
           overflow-x: hidden !important;
-          padding: 18px 26px 14px;
+          padding: 18px 18px 12px;
           overscroll-behavior: contain !important;
           scroll-behavior: smooth !important;
           position: relative;
@@ -574,7 +570,7 @@ if __name__ == "__main__":
           z-index: 1;
         }
         .mini-bot-row {
-          display: flex;
+          display: none;
           justify-content: flex-end;
           min-height: 104px;
           margin-top: -2px;
@@ -805,7 +801,7 @@ if __name__ == "__main__":
         }
         .msg-bubble {
           width: fit-content;
-          max-width: min(88%, 560px);
+          max-width: min(92%, 560px);
           background: var(--bot);
           color: var(--text);
           border: none;
@@ -861,6 +857,7 @@ if __name__ == "__main__":
           flex-wrap: nowrap !important;
           min-width: 0 !important;
           width: 100% !important;
+          padding: 0 !important;
         }
         #suggestions-panel {
           border: none !important;
@@ -872,16 +869,7 @@ if __name__ == "__main__":
           margin-top: -2px !important;
         }
         #admin-panel {
-          border: 1px solid var(--line) !important;
-          border-radius: 15px !important;
-          background: white !important;
-          flex: 0 0 auto !important;
-          margin-top: 0 !important;
-          overflow: hidden !important;
-          box-shadow: 0 8px 22px rgba(88, 28, 135, 0.08) !important;
-          position: relative !important;
-          z-index: 20 !important;
-          pointer-events: auto !important;
+          display: none !important;
         }
         #admin-controls {
           gap: 8px;
@@ -1102,10 +1090,10 @@ if __name__ == "__main__":
             font-size: 0.74rem;
           }
           #conversation-window {
-            height: clamp(190px, calc(100dvh - 420px), 430px) !important;
-            max-height: clamp(190px, calc(100dvh - 420px), 430px) !important;
-            min-height: 170px !important;
-            padding: 16px 12px 12px;
+            height: auto !important;
+            max-height: none !important;
+            min-height: 0 !important;
+            padding: 14px 12px 10px;
           }
           .mini-bot-row {
             min-height: 58px;

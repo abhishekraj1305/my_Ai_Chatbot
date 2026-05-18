@@ -166,9 +166,9 @@ The chatbot detects appointment intent such as "book call", "appointment", "sche
 - Preferred time and timezone
 - Purpose of call
 
-It checks local booked slots in `data/bookings.json`, suggests available slots for the requested date, prevents duplicate bookings for the same time, and generates a free Jitsi meeting link.
+It checks local booked slots in `runtime_data/bookings.json`, suggests available slots for the requested date, prevents duplicate bookings for the same time, and generates a free Jitsi meeting link.
 
-Jitsi is only the video meeting room. It does not work like a scheduler, so it will not show the chatbot's requested meeting time. The chatbot stores the actual schedule in `data/bookings.json`, shows it in the protected **Admin bookings** panel, and can send email alerts when SMTP is configured.
+Jitsi is only the video meeting room. It does not work like a scheduler, so it will not show the chatbot's requested meeting time. The chatbot stores the actual schedule in `runtime_data/bookings.json`, shows it in the protected **Admin bookings** panel, and can send email alerts when SMTP is configured. The admin PIN is MVP-grade protection for a private demo, not full production authentication.
 
 Optional notification and calendar environment variables:
 

@@ -2,6 +2,7 @@ __pycache__/
 .env
 .env.local
 vector_db/
+runtime_data/
 *.pyc
 *.log
 .DS_Store

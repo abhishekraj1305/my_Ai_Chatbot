@@ -17,6 +17,16 @@ from config import (
     VECTOR_DB_DIR,
 )
 from github_projects import summarize_github_projects
+from portfolio_facts import (
+    CONTACT_FACTS,
+    EXPERIENCE_FACTS,
+    PROFILE_SUMMARY,
+    PROJECT_FACTS,
+    data_engineering_answer,
+    projects_answer as curated_projects_answer,
+    skills_answer as curated_skills_answer,
+    warehousing_answer,
+)
 from utils.appointment import build_appointment_response, is_appointment_intent
 from vectorless_store import (
     collection_records as vectorless_records,
@@ -65,6 +75,10 @@ STOP_WORDS = {
     "what",
     "who",
     "with",
+    "pricing",
+    "price",
+    "cost",
+    "custom",
 }
 
 AUTOMATION_TERMS = {
@@ -81,6 +95,46 @@ AUTOMATION_TERMS = {
     "scraping",
     "digital",
     "transformation",
+}
+
+DATA_ENGINEERING_TERMS = {
+    "data engineer",
+    "data engineering",
+    "warehouse",
+    "warehousing",
+    "etl",
+    "elt",
+    "pipeline",
+    "pipelines",
+    "pyspark",
+    "spark",
+    "databricks",
+    "delta",
+    "lake",
+    "airflow",
+    "medallion",
+    "bronze",
+    "silver",
+    "gold",
+    "cdc",
+    "scd",
+    "azure",
+    "adf",
+    "blob",
+    "adls",
+    "sql server",
+    "snowflake",
+}
+
+UNSUPPORTED_TERMS = {
+    "pricing",
+    "price",
+    "cost",
+    "charges",
+    "rate",
+    "salary",
+    "ctc",
+    "availability calendar",
 }
 
 
@@ -307,6 +361,13 @@ def _direct_book_answer(question: str) -> Dict | None:
             "nivan",
             "written",
             "author",
+            "chapter",
+            "letter",
+            "baba",
+            "younger self",
+            "future wife",
+            "future partner",
+            "universe",
         ]
     ):
         return None
@@ -318,6 +379,18 @@ def _direct_book_answer(question: str) -> Dict | None:
     ]
     if not records:
         return None
+
+    section_key = _requested_book_section(question)
+    if section_key:
+        section_answer = _book_section_answer(section_key, records)
+        if section_answer:
+            return {"answer": section_answer, "sources": []}
+
+    chapter_number = _requested_book_chapter(question)
+    if chapter_number:
+        chapter_answer = _book_chapter_answer(chapter_number, records)
+        if chapter_answer:
+            return {"answer": chapter_answer, "sources": []}
 
     return {
         "answer": (
@@ -332,6 +405,205 @@ def _direct_book_answer(question: str) -> Dict | None:
         ),
         "sources": [],
     }
+
+
+def _requested_book_chapter(question: str) -> int | None:
+    lowered = question.lower()
+    match = re.search(r"\bchapter\s*(\d{1,2})\b", lowered)
+    if match:
+        return int(match.group(1))
+
+    word_numbers = {
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+        "eleven": 11,
+        "twelve": 12,
+        "thirteen": 13,
+        "fourteen": 14,
+        "fifteen": 15,
+        "sixteen": 16,
+        "seventeen": 17,
+        "eighteen": 18,
+        "nineteen": 19,
+        "twenty": 20,
+    }
+    for word, number in word_numbers.items():
+        if re.search(rf"\bchapter\s+{word}\b", lowered):
+            return number
+    return None
+
+
+def _requested_book_section(question: str) -> str | None:
+    lowered = question.lower()
+    section_aliases = {
+        "letter_to_baba": [
+            "letter to baba",
+            "letter 1",
+            "baba letter",
+            "to baba",
+        ],
+        "letter_to_younger_self": [
+            "letter to my younger self",
+            "younger self",
+            "letter 2",
+        ],
+        "letter_to_whoever_needs_this": [
+            "whoever needs this",
+            "letter 3",
+        ],
+        "letter_to_future_partner": [
+            "future wife",
+            "future partner",
+            "letter to my future wife",
+            "letter to my future partner",
+        ],
+        "letter_to_universe": [
+            "letter to the universe",
+            "unanswered prayer",
+            "unanswered prayers",
+            "universe",
+        ],
+    }
+    for section_key, aliases in section_aliases.items():
+        if any(alias in lowered for alias in aliases):
+            return section_key
+    return None
+
+
+def _book_text(records: List[Dict]) -> str:
+    return "\n".join(record["text"] for record in records)
+
+
+def _clean_book_title(title: str) -> str:
+    title = (
+        title.replace("\u2010", "-")
+        .replace("\u2011", "-")
+        .replace("\u2012", "-")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+    )
+    title = re.sub(r"^Letter\s+\d+\s*-\s*", "", title, flags=re.I)
+    return re.sub(r"\s+", " ", title).strip(" .")
+
+
+def _book_evidence(body: str, limit: int = 5) -> List[str]:
+    evidence = []
+    seen = set()
+    for sentence in _split_evidence(body):
+        cleaned = re.sub(r"\s+", " ", sentence).strip()
+        normalized = re.sub(r"\W+", " ", cleaned.lower()).strip()
+        if len(cleaned) < 35 or normalized in seen:
+            continue
+        seen.add(normalized)
+        evidence.append(cleaned)
+        if len(evidence) >= limit:
+            break
+    return evidence
+
+
+def _summarize_book_section(title: str, body: str, section_label: str) -> str:
+    title = _clean_book_title(title)
+    lowered_title = title.lower()
+
+    if "quiet grind" in lowered_title or "self" in lowered_title and "discipline" in lowered_title:
+        return (
+            f"{section_label}, **{title}**, is about choosing self-discipline as a way to rebuild after chaos, panic, loss, and numbness. "
+            "It frames discipline less as productivity aesthetics and more as survival, self-respect, and daily structure.\n\n"
+            "- The chapter says motivation is temporary, while discipline is what keeps a person moving after motivation fades.\n"
+            "- It connects structure with healing: small habits become a way to stop trauma from deciding the future.\n"
+            "- The emotional center is simple but strong: keep showing up even when there is no applause, witness, or celebration."
+        )
+
+    if "walking alone with panic" in lowered_title:
+        return (
+            f"{section_label}, **{title}**, is about carrying panic privately while still trying to function in ordinary life. "
+            "It focuses on the loneliness of anxiety, the body-level heaviness of fear, and the effort it takes to keep moving when the mind feels unsafe.\n\n"
+            "- The chapter treats panic as something lived through quietly, not as a dramatic scene.\n"
+            "- It shows the narrator learning to survive one moment at a time instead of pretending everything is fine.\n"
+            "- The emotional movement is from isolation toward the belief that surviving the night still counts as strength."
+        )
+
+    if "bruises before i understood hurt" in lowered_title:
+        return (
+            f"{section_label}, **{title}**, is about childhood pain before a child has the words to name it. "
+            "It explains how early fear, unsafe attention, and silent trauma can turn innocence into caution and survival instinct.\n\n"
+            "- The chapter shows a child sensing that something is wrong before understanding trauma, boundaries, or betrayal.\n"
+            "- It frames inner wounds as marks that later appear as alertness, reserve, mistrust, and shrinking oneself to stay safe.\n"
+            "- The emotional movement is from confusion and fear toward adult recognition: the narrator no longer blames the child-self, but honors him for surviving."
+        )
+
+    if "to baba" in lowered_title:
+        return (
+            f"{section_label}, **{title}**, is a grief-and-gratitude letter to Baba. "
+            "It remembers him through small daily details, his steadiness, and the narrator's wish to become someone he would be proud of.\n\n"
+            "- The letter says Baba's presence still lives in quiet memories, habits, kindness, patience, and empathy.\n"
+            "- It carries regret that the narrator could not save him, but also the feeling that Baba's lessons still guide him.\n"
+            "- The emotional shift is from missing Baba as pure loss to carrying him as strength and direction."
+        )
+
+    evidence = _book_evidence(body, limit=4)
+    if evidence:
+        return (
+            f"{section_label}, **{title}**, focuses on these ideas:\n\n"
+            + "\n".join(f"- {sentence}" for sentence in evidence)
+        )
+
+    return f"{section_label} is titled **{title}**, but I do not have enough clean text to summarize it reliably."
+
+
+def _book_section_answer(section_key: str, records: List[Dict]) -> str | None:
+    combined = _book_text(records)
+    section_patterns = {
+        "letter_to_baba": (
+            r"(Letter\s+1\s*[—–-]\s*To Baba)(.*?)(?=\n\s*Letter\s+2\s*[—–-]|\Z)",
+            "Letter 1",
+        ),
+        "letter_to_younger_self": (
+            r"(Letter\s+2\s*[—–-]\s*To My Younger Self)(.*?)(?=\n\s*Letter\s+3\s*[—–-]|\Z)",
+            "Letter 2",
+        ),
+        "letter_to_whoever_needs_this": (
+            r"(Letter\s+3\s*[—–-]\s*To Whoever Needs This)(.*?)(?=\n\s*Letter to My Future Wife|\Z)",
+            "Letter 3",
+        ),
+        "letter_to_future_partner": (
+            r"(Letter to My Future Wife\s*/\s*Partner)(.*?)(?=\n\s*Letter to the Universe|\Z)",
+            "Letter",
+        ),
+        "letter_to_universe": (
+            r"(Letter to the Universe\s*[—–-]\s*For Every Prayer That Went Unanswered)(.*?)(?=\Z)",
+            "Letter",
+        ),
+    }
+    pattern_config = section_patterns.get(section_key)
+    if not pattern_config:
+        return None
+
+    pattern, section_label = pattern_config
+    match = re.search(pattern, combined, re.I | re.S)
+    if not match:
+        return None
+    return _summarize_book_section(match.group(1), match.group(2), section_label)
+
+
+def _book_chapter_answer(chapter_number: int, records: List[Dict]) -> str | None:
+    combined = _book_text(records)
+    pattern = rf"Chapter\s+{chapter_number}\s*:\s*([^\n]+)(.*?)(?=\n\s*Chapter\s+\d+\s*:|\Z)"
+    match = re.search(pattern, combined, re.I | re.S)
+    if not match:
+        return f"I could not find Chapter {chapter_number} in the indexed book text. I can answer chapters that are present in the current document, such as chapters 1-29."
+
+    title = _clean_book_title(match.group(1))
+    body = match.group(2)
+    return _summarize_book_section(title, body, f"Chapter {chapter_number}")
 
 
 def _direct_contact_or_service_answer(question: str) -> Dict | None:
@@ -375,13 +647,63 @@ def _direct_contact_or_service_answer(question: str) -> Dict | None:
         return {
             "answer": (
                 "You can reach Abhishek through:\n\n"
-                "- Email: r.abhishek1305@gmail.com\n"
-                "- LinkedIn: https://www.linkedin.com/in/abhishekraj1305/\n"
-                "- GitHub: https://github.com/abhishekraj1305\n\n"
+                f"- Email: {CONTACT_FACTS['email']}\n"
+                f"- Phone: {CONTACT_FACTS['phone']}\n"
+                f"- LinkedIn: {CONTACT_FACTS['linkedin']}\n"
+                f"- GitHub: {CONTACT_FACTS['github']}\n\n"
                 "If you want a call, ask me to book one and I will collect the details."
             ),
             "sources": [],
         }
+
+    return None
+
+
+def _direct_curated_answer(question: str) -> Dict | None:
+    lowered = question.lower()
+
+    if any(term in lowered for term in UNSUPPORTED_TERMS):
+        return {
+            "answer": (
+                "I do not have verified pricing, salary, or commercial-rate information in Abhishek's public portfolio data. "
+                "For a project discussion, you can contact Abhishek directly or ask me to book a call."
+            ),
+            "sources": [],
+        }
+
+    if any(phrase in lowered for phrase in ["who is", "about abhishek", "profile", "summary"]):
+        return {"answer": PROFILE_SUMMARY, "sources": []}
+
+    if any(term in lowered for term in DATA_ENGINEERING_TERMS):
+        if any(term in lowered for term in ["warehouse", "warehousing", "medallion", "bronze", "silver", "gold", "delta", "cdc", "scd"]):
+            return {"answer": warehousing_answer(), "sources": []}
+        return {"answer": data_engineering_answer(), "sources": []}
+
+    if "azure" in lowered:
+        return {
+            "answer": (
+                "Abhishek's Azure experience includes Azure Data Factory, Azure Blob Storage, Azure Data Lake Storage, Azure VMs, "
+                "Azure SQL-style reporting paths, and batch ETL workflows. At AiToXr, he used Python with Azure VMs for 160+ global "
+                "sources and Azure Data Factory/Blob Storage for batch processing that reduced manual intervention by 95%."
+            ),
+            "sources": [],
+        }
+
+    if any(term in lowered for term in ["skill", "stack", "tools", "technologies"]):
+        return {"answer": curated_skills_answer(), "sources": []}
+
+    if any(term in lowered for term in ["experience", "worked", "career", "job"]):
+        bullets = []
+        for role in EXPERIENCE_FACTS:
+            bullets.append(f"{role['role']} at {role['org']} ({role['period']}): " + " ".join(role["facts"]))
+        return {"answer": "Abhishek's experience summary:\n\n" + "\n".join(f"- {item}" for item in bullets), "sources": []}
+
+    if any(term in lowered for term in ["project", "built", "case study", "portfolio"]):
+        if "zomato" in lowered or "restaurant" in lowered or "nlp" in lowered:
+            project = next((item for item in PROJECT_FACTS if "NLP restaurant" in item["name"]), None)
+            if project:
+                return {"answer": project["name"] + ":\n\n" + "\n".join(f"- {fact}" for fact in project["facts"]), "sources": []}
+        return {"answer": curated_projects_answer(), "sources": []}
 
     return None
 
@@ -640,7 +962,7 @@ def _build_projects_answer(evidence: List[str]) -> str:
         )
     if re.search(r"nlp model|restaurant ratings|1m\\+ reviews", joined, re.I):
         bullets.append(
-            "NLP restaurant-rating prediction model: used Python, TensorFlow, and NLTK on 1M+ reviews, with reported 90% accuracy."
+            "NLP restaurant-rating prediction model: public repo frames the project around 20K+ reviews with about 85% accuracy per README."
         )
     if re.search(r"mlops pipeline|gcp|kubernetes|jenkins", joined, re.I):
         bullets.append(
@@ -690,6 +1012,15 @@ def _retrieval_fallback_answer(question: str, retrieved: List[Dict]) -> str:
     if not evidence:
         return "The information is not available in the provided data."
 
+    terms = _query_terms(question)
+    evidence_text = " ".join(evidence).lower()
+    matched_terms = {term for term in terms if term in evidence_text}
+    if len(terms) >= 2 and len(matched_terms) < 2:
+        return (
+            "I do not have enough verified information in Abhishek's public portfolio data to answer that accurately. "
+            "You can ask about his data engineering work, Azure pipelines, PySpark/Medallion projects, automation, skills, contact details, or booking a call."
+        )
+
     return "Based on Abhishek's documents:\n\n" + "\n".join(
         f"- {sentence}" for sentence in evidence[:5]
     )
@@ -719,6 +1050,11 @@ def answer_question(question: str) -> Dict:
     if contact_answer:
         _log("Response generated from contact/service facts.")
         return contact_answer
+
+    curated_answer = _direct_curated_answer(question)
+    if curated_answer:
+        _log("Response generated from curated portfolio facts.")
+        return curated_answer
 
     if _is_document_inventory_question(question):
         try:
