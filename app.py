@@ -488,7 +488,8 @@ if __name__ == "__main__":
         .main,
         .contain {
           height: 100vh !important;
-          overflow-y: auto !important;
+          max-height: 100vh !important;
+          overflow: hidden !important;
           overflow-x: hidden !important;
         }
         .gradio-container {
@@ -516,7 +517,7 @@ if __name__ == "__main__":
           overflow: hidden !important;
           overflow-x: hidden !important;
           position: relative !important;
-          padding: 12px !important;
+          padding: 10px 12px max(12px, env(safe-area-inset-bottom)) !important;
           background: #f8f5ff !important;
         }
         .hero {
@@ -853,20 +854,25 @@ if __name__ == "__main__":
           gap: 8px;
           background: transparent !important;
           flex: 0 0 auto !important;
+          order: 5 !important;
           z-index: 3;
           flex-wrap: nowrap !important;
           min-width: 0 !important;
           width: 100% !important;
           padding: 0 !important;
+          margin: 0 !important;
         }
         #suggestions-panel {
           border: none !important;
           border-radius: 0 !important;
           background: transparent !important;
           flex: 0 0 auto !important;
+          order: 6 !important;
           box-shadow: none !important;
           padding: 0 4px !important;
-          margin-top: -2px !important;
+          margin: 0 !important;
+          max-height: 52px !important;
+          overflow: hidden !important;
         }
         #admin-panel {
           display: none !important;
@@ -1014,7 +1020,7 @@ if __name__ == "__main__":
         }
         #composer,
         #composer textarea {
-          min-height: 54px !important;
+          min-height: 50px !important;
           border-radius: 18px !important;
           background: var(--panel-soft) !important;
           color: var(--text) !important;
@@ -1022,7 +1028,8 @@ if __name__ == "__main__":
           box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.08), 0 0 18px rgba(168, 85, 247, 0.18) !important;
         }
         #composer textarea {
-          padding: 14px 16px !important;
+          max-height: 96px !important;
+          padding: 12px 16px !important;
           resize: vertical !important;
         }
         #composer textarea::placeholder {
@@ -1031,7 +1038,7 @@ if __name__ == "__main__":
         #send-button,
         #clear-button {
           border-radius: 18px !important;
-          min-height: 54px !important;
+          min-height: 50px !important;
           font-weight: 700 !important;
         }
         #send-button {
@@ -1077,7 +1084,7 @@ if __name__ == "__main__":
         }
         @media (max-width: 520px) {
           .gradio-container {
-            padding: 0 6px 8px !important;
+            padding: 0 !important;
           }
           .hero {
             margin: 0 -6px 0;
@@ -1139,8 +1146,8 @@ if __name__ == "__main__":
             font-size: 0.95rem;
           }
           #send-button {
-            min-width: 84px !important;
-            max-width: 88px !important;
+            min-width: 78px !important;
+            max-width: 82px !important;
           }
           #suggestions-panel {
             padding: 0 2px !important;
